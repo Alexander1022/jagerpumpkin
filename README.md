@@ -1,2 +1,2 @@
-# jagerpumpkin
+# Jägerpumpkin
 🍹🎃
