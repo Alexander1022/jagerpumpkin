@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input"
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import apiClient from "@/api/client"
-import axios from "axios"
+import { isAxiosError } from "axios"
 
 interface SignupResponse {
   message: string
@@ -61,10 +61,24 @@ export function SignupForm({
 
       navigate("/login", { replace: true })
     } catch (err) {
-      if (
-        axios.isAxiosError(err)
-      ) {
-        setError(err?.response?.data?.detail)
+      if (isAxiosError(err)) {
+        const status = err.response?.status
+        const detailRaw = err.response?.data?.detail
+        const detail = typeof detailRaw === "string" ? detailRaw : ""
+        const nicknameTaken =
+          status === 409 || /taken|exists|already/i.test(detail)
+
+        if (!err.response) {
+          setError("Cannot reach server right now. Please try again later.")
+        } else if (nicknameTaken) {
+          setError("This nickname is already taken. Please choose another one.")
+        } else if (status && status >= 500) {
+          setError("Server is currently unavailable. Please try again later.")
+        } else if (detail) {
+          setError(detail)
+        } else {
+          setError("Signup failed. Please try again.")
+        }
       } else {
         setError("Signup failed. Please try again.")
       }
