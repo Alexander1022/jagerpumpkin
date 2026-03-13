@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  api:
+    build: ./api
+    container_name: fastapi
+    networks:
+      - tor_net
+
+  tor:
+    image: osminogin/tor-simple
+    container_name: tor
+    volumes:
+      - ./torrc:/etc/tor/torrc
+      - ./hidden_service:/var/lib/tor/hidden_service
+    depends_on:
+      - api
+    networks:
+      - tor_net
+
+networks:
+  tor_net:
