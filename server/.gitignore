@@ -2,3 +2,4 @@
 .code/
 .env
 .DS_Store
+hidden_service/
