@@ -1,4 +1,5 @@
 import apiClient from "@/api/client"
+import axios from "axios"
 import {
   createContext,
   useContext,
@@ -14,7 +15,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null
-  login: (token: string) => void
+  login: (token: string) => Promise<void>
   logout: () => void
   isLoading: boolean
 }
@@ -37,7 +38,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(response.data)
     } catch (error) {
       console.error("Failed to fetch user profile:", error)
-      logout()
+
+      // Clear session only when the token is no longer valid.
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        logout()
+      }
     } finally {
       setIsLoading(false)
     }
