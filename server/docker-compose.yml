@@ -15,13 +15,6 @@ services:
     volumes:
       - ./torrc:/etc/tor/torrc
       - ./hidden_service:/var/lib/tor/hidden_service
-    command: >
-      sh -c "
-      mkdir -p /var/lib/tor/hidden_service &&
-      chmod 700 /var/lib/tor/hidden_service &&
-      chown -R tor:tor /var/lib/tor &&
-      exec tor -f /etc/tor/torrc
-      "
     depends_on:
       - api
     networks:
@@ -30,5 +23,5 @@ services:
 networks:
   tor_net:
 
-volumes:
-  tor_hidden_service:
+#volumes:
+#  tor_hidden_service:
