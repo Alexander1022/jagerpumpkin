@@ -1,11 +1,6 @@
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Field,
   FieldDescription,
@@ -13,6 +8,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { isAxiosError } from "axios"
 import { useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import apiClient from "@/api/client"
@@ -53,8 +49,20 @@ export function LoginForm({
 
       await login(response.data.token)
       navigate(fromPath, { replace: true })
-    } catch {
-      setError("Invalid credentials. Please try again.")
+    } catch (error) {
+      if (isAxiosError(error)) {
+        const status = error.response?.status
+
+        if (status === 400) {
+          setError("Invalid credentials. Please try again.")
+        } else if (status && status >= 500) {
+          setError("Server error. Please try again later.")
+        } else {
+          setError("Login failed. Please try again.")
+        }
+      } else {
+        setError("Login failed. Please try again.")
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -102,7 +110,8 @@ export function LoginForm({
                   {isSubmitting ? "Logging in..." : "Login"}
                 </Button>
                 <FieldDescription className="text-center">
-                  Don&apos;t have an account? <Link to="/register">Sign up</Link>
+                  Don&apos;t have an account?{" "}
+                  <Link to="/register">Sign up</Link>
                 </FieldDescription>
               </Field>
             </FieldGroup>
