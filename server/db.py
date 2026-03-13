@@ -23,7 +23,7 @@ class Message_Queue(Base):
     recipient_id = Column(Integer, ForeignKey("users.id"))
     sender_id = Column(Integer, ForeignKey("users.id"))
     content = Column(BLOB)
-    created_at = Column(DateTime, default=datetime.now())
+    created_at = Column(DateTime, default=datetime.now)
 
     def __repr__(self) -> str:
         return f"Message({self.id}, {self.recipient_id}, {self.sender_id}, {self.created_at} ,{self.content})"
