@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
+import Tarator from "@/assets/logo.webp"
 
 const LandingPage = () => {
   return (
@@ -15,6 +16,7 @@ const LandingPage = () => {
           <h1 className="text-4xl leading-tight font-semibold tracking-tight text-balance md:text-6xl">
             TaraTOR
           </h1>
+          <img src={Tarator} alt="TaraTOR logo" className="w-64 rounded-md" />
           <p className="max-w-2xl text-base text-muted-foreground md:text-lg">
             TaraTOR combines nice UI with TOR network to provide secure and
             private chat experience for individuals.

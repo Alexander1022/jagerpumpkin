@@ -1,3 +1,8 @@
+import {
+  clearAuthToken,
+  hasAuthToken,
+  setAuthToken,
+} from "@/api/client"
 import apiClient from "@/api/client"
 import axios from "axios"
 import {
@@ -28,8 +33,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
+      if (!hasAuthToken()) {
         setIsLoading(false)
         return
       }
@@ -53,13 +57,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   const login = async (token: string) => {
-    localStorage.setItem("token", token)
+    setAuthToken(token)
     await fetchProfile()
   }
 
   const logout = () => {
     setUser(null)
-    localStorage.removeItem("token")
+    clearAuthToken()
   }
 
   return (
