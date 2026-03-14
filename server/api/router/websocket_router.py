@@ -1,14 +1,14 @@
-from fastapi import APIRouter, Websocket, Depends, WebsocketDisconnect
+from fastapi import APIRouter, WebSocket, Depends, WebSocketDisconnect
 from typing import Annotated
 
 from server.api.router.auth_router import get_user_id
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: dict[int, Websocket] = {}
+        self.active_connections: dict[int, WebSocket] = {}
         self.room_connections: dict[str, set[int]] = {}
 
-    async def connect(self, user_id: int, websocket: Websocket):
+    async def connect(self, user_id: int, websocket: WebSocket):
         await websocket.accept()
         self.active_connections[user_id] = websocket
 
@@ -30,13 +30,13 @@ router = APIRouter(prefix="/websocket", tags=["websocket"])
 manager = ConnectionManager()
 
 @router.websocket("/{user_id}")
-async def websocket_endpoint(websocket: Websocket, user_id: Annotated[int, Depends(get_user_id)]):
+async def websocket_endpoint(websocket: WebSocket, user_id: Annotated[int, Depends(get_user_id)]):
     await manager.connect(user_id, websocket)
     manager.room_connections.setdefault("global", set()).add(user_id)
     try:
         while True:
             data = await websocket.receive_text()
             await manager.send_personal_message(data, user_id)
-    except WebsocketDisconnect:
+    except WebSocketDisconnect:
         manager.disconnect(user_id)
         manager.room_connections["global"].discard(user_id)
