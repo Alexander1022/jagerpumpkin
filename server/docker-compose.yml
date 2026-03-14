@@ -8,6 +8,8 @@ services:
       - tor_net
     expose:
       - 8000
+    env_file:
+      - .env
 
   tor:
     image: osminogin/tor-simple
