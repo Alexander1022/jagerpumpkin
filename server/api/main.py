@@ -6,6 +6,7 @@ from server.api.router.feed_router import router as feed_rt
 from server.api.router.cucumber_router import router as cucumber_rt
 from server.api.router.websocket_router import router as websocket_rt
 from server.api.router.user_router import router as user_rt
+from server.api.router.connection_router import router as connection_rt
 import os
 
 app = FastAPI()
@@ -38,3 +39,4 @@ app.include_router(crypt_rt, prefix="/api")
 app.include_router(feed_rt, prefix="/api")
 app.include_router(cucumber_rt, prefix="/api")
 app.include_router(websocket_rt, prefix="/api")
+app.include_router(connection_rt, prefix="/api")
