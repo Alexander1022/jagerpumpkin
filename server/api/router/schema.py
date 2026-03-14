@@ -10,11 +10,19 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class TokenPair(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
 class AuthResponse(BaseModel):
     user_id: int
     username: str
-    access_token: str
-    token_type: str = "bearer"
+    tokens:TokenPair
 
 
 class SignupResponse(BaseModel):
