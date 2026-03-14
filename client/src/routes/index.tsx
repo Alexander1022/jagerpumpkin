@@ -10,13 +10,12 @@ import Cucumber from "@/pages/Cucumber"
 
 export const router = createBrowserRouter([
   {
-    path: "/",
     element: <RootLayout />,
     children: [
-      { index: true, element: <LandingPage /> },
       {
         element: <PublicRoute />,
         children: [
+          { path: "/", element: <LandingPage /> },
           { path: "login", element: <Login /> },
           { path: "register", element: <Register /> },
         ],

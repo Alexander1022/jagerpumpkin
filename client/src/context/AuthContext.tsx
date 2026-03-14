@@ -19,7 +19,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null
-  login: (token: string) => Promise<void>
+  login: (token: string, refreshToken?: string) => Promise<void>
   logout: () => void
   isLoading: boolean
 }
@@ -54,8 +54,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     fetchProfile()
   }, [])
 
-  const login = async (token: string) => {
-    setAuthToken(token)
+  const login = async (token: string, refreshToken?: string) => {
+    setAuthToken(token, refreshToken)
     await fetchProfile()
   }
 

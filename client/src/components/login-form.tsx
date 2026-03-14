@@ -15,7 +15,11 @@ import apiClient from "@/api/client"
 import { useAuth } from "@/context/AuthContext"
 
 interface LoginResponse {
-  token: string
+  tokens: {
+    access_token: string
+    refresh_token: string
+    token_type: string
+  }
 }
 
 export function LoginForm({
@@ -47,7 +51,10 @@ export function LoginForm({
         password,
       })
 
-      await login(response.data.token)
+      await login(
+        response.data.tokens.access_token,
+        response.data.tokens.refresh_token,
+      )
       navigate(fromPath, { replace: true })
     } catch (error) {
       if (isAxiosError(error)) {
