@@ -4,8 +4,6 @@ from server.api.router.auth_router import router as auth_rt
 import os
 
 app = FastAPI()
-<<<<<<< Updated upstream
-=======
 
 origins_env = os.getenv("CORS_ALLOW_ORIGINS", "")
 origins = [origin.strip() for origin in origins_env.split(",") if origin.strip()]
@@ -19,16 +17,14 @@ if not origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    # Also allow localhost variants and Tor onion frontends.
     allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$|https?://[a-z2-7]{16,56}\.onion(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(auth_rt, prefix="/api")
->>>>>>> Stashed changes
 @app.get("/")
 def root():
     return {"message": "TaraTOR"}
+
 app.include_router(auth_rt, prefix="/api")
