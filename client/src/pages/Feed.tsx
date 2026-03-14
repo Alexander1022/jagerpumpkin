@@ -2,6 +2,7 @@ import { getAllMessages, getCurrentUserIdFromToken } from "@/api/crypto"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import MyCodeDialog from "@/components/MyCodeDialog"
 import { useAuth } from "@/context/AuthContext"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
@@ -135,17 +136,20 @@ const Feed = () => {
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-xl">Your Chats</CardTitle>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                loadConversations()
-              }}
-              disabled={isLoading}
-            >
-              {isLoading ? "Syncing..." : "Refresh"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <MyCodeDialog />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  loadConversations()
+                }}
+                disabled={isLoading}
+              >
+                {isLoading ? "Syncing..." : "Refresh"}
+              </Button>
+            </div>
           </div>
           <Input
             value={search}
