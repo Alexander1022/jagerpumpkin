@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return
       }
 
-      const response = await apiClient.get<User>("/auth/me")
+      const response = await apiClient.get<User>("/api/auth/me")
       setUser(response.data)
     } catch (error) {
       console.error("Failed to fetch user profile:", error)

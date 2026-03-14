@@ -42,7 +42,7 @@ export function LoginForm({
     setIsSubmitting(true)
 
     try {
-      const response = await apiClient.post<LoginResponse>("/auth/login", {
+      const response = await apiClient.post<LoginResponse>("/api/auth/login", {
         username: username.trim(),
         password,
       })

@@ -58,7 +58,7 @@ export function SignupForm({
     setIsSubmitting(true)
 
     try {
-      await apiClient.post<SignupResponse>("/auth/signup", {
+      await apiClient.post<SignupResponse>("/api/auth/signup", {
         username: username.trim(),
         password,
         public_key: "",
