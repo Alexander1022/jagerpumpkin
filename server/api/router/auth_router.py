@@ -143,4 +143,4 @@ def me(user_id: int = Depends(get_user_id)):
     user = session.query(User).filter_by(id=user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return MeResponse(username=user)
+    return MeResponse(username=user.username)
