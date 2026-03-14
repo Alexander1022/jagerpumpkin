@@ -23,7 +23,7 @@ export default function RootLayout() {
   return (
     <div className="min-h-svh bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-3">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-3 py-3 sm:px-6">
           <Link to="/" className="text-sm font-semibold tracking-wide">
             TaraTOR
           </Link>
@@ -48,8 +48,8 @@ export default function RootLayout() {
               <NavigationMenuList>
                 <NavigationMenuItem>
                   <NavigationMenuTrigger>{user.username}</NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <ul className="grid min-w-36 gap-1 p-2">
+                  <NavigationMenuContent className="right-0 left-auto w-40">
+                    <ul className="grid w-full gap-1 p-2">
                       <li>
                         <button
                           type="button"

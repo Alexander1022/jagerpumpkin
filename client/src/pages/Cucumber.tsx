@@ -1,11 +1,11 @@
 import {
   decryptReceivedMessage,
   getAllMessages,
-  getCurrentUserIdFromToken,
   sendEncryptedMessage,
 } from "@/api/crypto"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
+import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -20,7 +20,9 @@ import { Separator } from "@/components/ui/separator"
 interface DisplayMessage {
   message_id: number
   sender_id: number
+  sender_username: string
   recipient_id: number
+  recipient_username: string
   created_at: string
   plaintext: string
 }
@@ -28,7 +30,9 @@ interface DisplayMessage {
 interface SentMessage {
   message_id: number
   sender_id: number
+  sender_username: string
   recipient_id: number
+  recipient_username: string
   created_at: string
   plaintext: string
 }
@@ -36,7 +40,9 @@ interface SentMessage {
 interface ChatMessage {
   message_id: number
   sender_id: number
+  sender_username: string
   recipient_id: number
+  recipient_username: string
   created_at: string
   plaintext: string
   isOwn: boolean
@@ -61,6 +67,7 @@ const formatTimestamp = (value: string) => {
 export default function Cucumber() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [message, setMessage] = useState("")
   const [isSending, setIsSending] = useState(false)
   const [messages, setMessages] = useState<DisplayMessage[]>([])
@@ -69,7 +76,7 @@ export default function Cucumber() {
 
   const recipientId = Number(id)
   const canSend = Number.isInteger(recipientId) && recipientId > 0
-  const currentUserId = getCurrentUserIdFromToken()
+  const currentUsername = user?.username ?? null
 
   const loadMessages = async () => {
     setIsLoadingMessages(true)
@@ -77,9 +84,11 @@ export default function Cucumber() {
     try {
       const all = await getAllMessages()
 
-      if (currentUserId) {
+      if (currentUsername) {
         const received = all.filter(
-          (item) => item.recipient_id === currentUserId
+          (item) =>
+            item.recipient_username === currentUsername &&
+            item.sender_username !== currentUsername
         )
 
         const decrypted = await Promise.all(
@@ -89,7 +98,9 @@ export default function Cucumber() {
               return {
                 message_id: item.message_id,
                 sender_id: item.sender_id,
+                sender_username: item.sender_username,
                 recipient_id: item.recipient_id,
+                recipient_username: item.recipient_username,
                 created_at: item.created_at,
                 plaintext,
                 decryptOk: true,
@@ -98,7 +109,9 @@ export default function Cucumber() {
               return {
                 message_id: item.message_id,
                 sender_id: item.sender_id,
+                sender_username: item.sender_username,
                 recipient_id: item.recipient_id,
+                recipient_username: item.recipient_username,
                 created_at: item.created_at,
                 plaintext: "[Unable to decrypt message]",
                 decryptOk: false,
@@ -148,7 +161,7 @@ export default function Cucumber() {
   }, [messages, sentMessages])
 
   const handleSend = async () => {
-    if (!canSend || !message.trim() || isSending || !currentUserId) return
+    if (!canSend || !message.trim() || isSending || !currentUsername) return
 
     setIsSending(true)
     const rawMessage = message.trim()
@@ -162,7 +175,9 @@ export default function Cucumber() {
         {
           message_id: payload.message_id,
           sender_id: payload.sender_id,
+          sender_username: currentUsername,
           recipient_id: payload.recipient_id,
+          recipient_username: String(id ?? ""),
           created_at: new Date().toISOString(),
           plaintext: rawMessage,
         },
@@ -242,7 +257,7 @@ export default function Cucumber() {
                             : "text-[11px] text-muted-foreground"
                         }
                       >
-                        {item.isOwn ? "you" : `from ${item.sender_id}`} at{" "}
+                        {item.isOwn ? "you" : `from ${item.sender_username}`} at{" "}
                         {formatTimestamp(item.created_at)}
                       </p>
                     </div>

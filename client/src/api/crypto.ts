@@ -8,7 +8,9 @@ const ACCESS_TOKEN_STORAGE_KEY = "access_token"
 export interface EncryptedMessageItem {
   message_id: number
   sender_id: number
+  sender_username: string
   recipient_id: number
+  recipient_username: string
   encrypted_message: string
   encrypted_key: string
   iv: string
