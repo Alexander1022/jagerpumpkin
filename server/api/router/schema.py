@@ -29,3 +29,6 @@ class SignupResponse(BaseModel):
     user_id: int
     username: str
     created_at: str
+
+class MeResponse(BaseModel):
+    username: str

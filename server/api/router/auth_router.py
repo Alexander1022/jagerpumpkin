@@ -1,9 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header, Depends
 import bcrypt
 import hashlib
 
 from server.api.router.schema import SignupRequest, LoginRequest, SignupResponse, AuthResponse, TokenPair, \
-    RefreshRequest
+    RefreshRequest, MeResponse
 from server.db import session, User
 
 import jwt
@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 import os
 SECRET_KEY = os.environ["JWT_SECRET"]
 ALGORITHM = "HS256"
-ACCESS_TOKEN_MIN = 1
+ACCESS_TOKEN_MIN = 10
 REFRESH_TOKEN_DAYS = 1
 
 
@@ -20,6 +20,7 @@ def create_access_token(user_id: int, username: str) -> str:
     payload = {
         "sub": str(user_id),
         "username": username,
+        "type": "access",
         "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_MIN),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -115,3 +116,23 @@ def refresh_token(req: RefreshRequest):
         access_token=new_access,
         refresh_token=req.refresh_token
     )
+
+def get_current_user(authorization: str = Header(...)) -> str:
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid auth header")
+    token = authorization[len("Bearer "):].strip()  # strip whitespace
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+        if payload.get("type") != "access":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        return payload["username"]
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Access token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+@router.get("/me", response_model=MeResponse)
+def me(user: str = Depends(get_current_user)):
+    return MeResponse(username=user)
