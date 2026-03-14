@@ -1,9 +1,11 @@
 import {
   decryptReceivedMessage,
   getAllMessages,
+  getCurrentUserIdFromToken,
   sendEncryptedMessage,
 } from "@/api/crypto"
-import { useEffect, useMemo, useState } from "react"
+import apiClient from "@/api/client"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
@@ -52,6 +54,7 @@ interface SendMessageResponse {
   message_id: number
   sender_id: number
   recipient_id: number
+  created_at: string
 }
 
 const formatTimestamp = (value: string) => {
@@ -61,7 +64,23 @@ const formatTimestamp = (value: string) => {
     return value
   }
 
-  return date.toLocaleString()
+  return date.toLocaleString(undefined, { timeZone: "UTC" }) + " UTC"
+}
+
+const buildWebSocketUrl = (
+  apiBaseUrl: string,
+  userId: number,
+  token: string
+) => {
+  let wsBase = apiBaseUrl.trim()
+
+  if (wsBase.startsWith("https://")) {
+    wsBase = `wss://${wsBase.slice("https://".length)}`
+  } else if (wsBase.startsWith("http://")) {
+    wsBase = `ws://${wsBase.slice("http://".length)}`
+  }
+
+  return `${wsBase}/api/websocket/${userId}?token=${encodeURIComponent(token)}`
 }
 
 export default function Cucumber() {
@@ -77,8 +96,9 @@ export default function Cucumber() {
   const recipientId = Number(id)
   const canSend = Number.isInteger(recipientId) && recipientId > 0
   const currentUsername = user?.username ?? null
+  const currentUserId = getCurrentUserIdFromToken()
 
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async () => {
     setIsLoadingMessages(true)
 
     try {
@@ -131,11 +151,115 @@ export default function Cucumber() {
     } finally {
       setIsLoadingMessages(false)
     }
-  }
+  }, [currentUsername, navigate])
 
   useEffect(() => {
     loadMessages()
-  }, [])
+  }, [loadMessages])
+
+  useEffect(() => {
+    if (!user || !currentUserId || !canSend) return
+
+    let disposed = false
+    let socket: WebSocket | null = null
+    let reconnectTimer: number | null = null
+    let reconnectAttempt = 0
+
+    const clearReconnectTimer = () => {
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
+    }
+
+    const scheduleReconnect = () => {
+      if (disposed) return
+
+      const delay = Math.min(1000 * 2 ** reconnectAttempt, 8000)
+      reconnectAttempt += 1
+
+      clearReconnectTimer()
+      reconnectTimer = window.setTimeout(() => {
+        void connect()
+      }, delay)
+    }
+
+    const ensureAccessToken = async () => {
+      try {
+        await apiClient.get("/api/auth/me")
+      } catch {}
+
+      return window.localStorage.getItem("access_token")
+    }
+
+    const connect = async () => {
+      if (disposed) return
+
+      if (
+        socket &&
+        (socket.readyState === WebSocket.OPEN ||
+          socket.readyState === WebSocket.CONNECTING)
+      ) {
+        return
+      }
+
+      const token = await ensureAccessToken()
+      if (disposed) return
+
+      if (!token) {
+        scheduleReconnect()
+        return
+      }
+
+      const wsUrl = buildWebSocketUrl(
+        import.meta.env.VITE_API_URL,
+        currentUserId,
+        token
+      )
+      const ws = new WebSocket(wsUrl)
+      socket = ws
+
+      ws.onopen = () => {
+        reconnectAttempt = 0
+      }
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as {
+            type?: string
+            sender_id?: number
+          }
+
+          if (
+            data.type === "NEW_MESSAGE" &&
+            Number(data.sender_id) === recipientId
+          ) {
+            void loadMessages()
+          }
+        } catch {}
+      }
+
+      ws.onerror = () => {
+        ws.close()
+      }
+
+      ws.onclose = () => {
+        if (disposed) return
+        scheduleReconnect()
+      }
+    }
+
+    void connect()
+
+    return () => {
+      disposed = true
+      clearReconnectTimer()
+
+      if (socket && socket.readyState !== WebSocket.CLOSED) {
+        socket.close()
+      }
+    }
+  }, [canSend, currentUserId, loadMessages, recipientId, user])
 
   const visibleMessages = useMemo<ChatMessage[]>(() => {
     const received = messages.map((item) => ({
@@ -178,7 +302,7 @@ export default function Cucumber() {
           sender_username: currentUsername,
           recipient_id: payload.recipient_id,
           recipient_username: String(id ?? ""),
-          created_at: new Date().toISOString(),
+          created_at: payload.created_at,
           plaintext: rawMessage,
         },
       ])

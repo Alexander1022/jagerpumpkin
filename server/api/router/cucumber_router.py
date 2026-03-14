@@ -65,43 +65,45 @@ def get_messages(user_id: int = Depends(get_user_id)):
 
 @router.post("/{recipient_id}", response_model=EnqueueMessageResponse)
 async def enqueue_message(recipient_id: int, req: EnqueueMessageRequest, sender_id: int = Depends(get_user_id)):
-    if manager.is_user_connected(recipient_id):
-        await manager.send_personal_message(req, recipient_id)
-        return
-        
     recipient = session.query(User).filter_by(id=recipient_id).first()
     if not recipient:
         raise HTTPException(status_code=404, detail="Recipient not found")
-
+    
     try:
         base64.b64decode(req.encrypted_message, validate=True)
         base64.b64decode(req.encrypted_key, validate=True)
         base64.b64decode(req.iv, validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise HTTPException(status_code=400, detail="Invalid encrypted payload") from exc
-
-    content_payload = json.dumps(
-        {
-            "encrypted_message": req.encrypted_message,
-            "encrypted_key": req.encrypted_key,
-            "iv": req.iv,
-        }
-    ).encode("utf-8")
+    except binascii.Error:
+        raise HTTPException(status_code=400, detail="Invalid base64 encoding")
+    
+    content_payload = json.dumps({
+        "encrypted_message": req.encrypted_message,
+        "encrypted_key": req.encrypted_key,
+        "iv": req.iv
+    }).encode("utf-8")
 
     msg = Message_Queue(
         sender_id=sender_id,
         recipient_id=recipient_id,
-        content=content_payload,
+        content=content_payload
     )
 
     session.add(msg)
     session.commit()
     session.refresh(msg)
 
+    if manager.is_user_connected(recipient_id):
+        notification = json.dumps({
+            "type": "NEW_MESSAGE",
+            "sender_id": sender_id
+        })
+        await manager.send_personal_message(notification, recipient_id)
+
     return EnqueueMessageResponse(
         message_id=msg.id,
         sender_id=sender_id,
-        recipient_id=recipient_id
+        recipient_id=recipient_id,
+        created_at=msg.created_at,
     )
 
 @router.get("/{sender_id}", response_model=DequeueMessageResponse)

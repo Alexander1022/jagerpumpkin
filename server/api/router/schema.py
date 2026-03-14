@@ -50,6 +50,7 @@ class EnqueueMessageResponse(BaseModel):
     message_id: int
     sender_id: int
     recipient_id: int
+    created_at: datetime
 
 
 class MessageItemResponse(BaseModel):

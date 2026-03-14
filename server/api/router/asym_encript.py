@@ -15,6 +15,10 @@ class KeyExchangeRequest(BaseModel):
     client_id: str
     encrypted_key: str
 
+
+class UpdatePublicKeyRequest(BaseModel):
+    public_key: str
+
 def generate_keys():
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     public_key = private_key.public_key()
@@ -74,8 +78,23 @@ def get_user_public_key(user_id: int):
 
     return user.public_key
 
+
+@router.put("/public_key")
+def upsert_user_public_key(
+    data: UpdatePublicKeyRequest,
+    user_id: Annotated[int, Depends(get_user_id)],
+):
+    user = session.query(User).filter_by(id=user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.public_key = data.public_key
+    session.commit()
+
+    return {"message": "Public key updated"}
+
 @router.post("/exchange_key")
-def exchange_key(data: KeyExchangeRequest, user: Annotated[str, Depends(get_user_id)]):
+def exchange_key(data: KeyExchangeRequest, user_id: Annotated[int, Depends(get_user_id)]):
     try:
         encrypted_key_bytes = base64.b64decode(data.encrypted_key, validate=True)
         symmetric_key = keys[0].decrypt(
@@ -89,5 +108,5 @@ def exchange_key(data: KeyExchangeRequest, user: Annotated[str, Depends(get_user
     except (binascii.Error, ValueError) as exc:
         raise HTTPException(status_code=400, detail="Invalid encrypted key") from exc
 
-    session_keys[user] = symmetric_key
+    session_keys[user_id] = symmetric_key
     return {"message": "Symmetric key received and decrypted successfully"}

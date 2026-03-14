@@ -159,6 +159,16 @@ export const getOrCreateClientIdentity = async () => {
   }
 }
 
+export const syncCurrentUserPublicKey = async () => {
+  const identity = await getOrCreateClientIdentity()
+
+  await apiClient.put("/api/crypt/public_key", {
+    public_key: identity.publicKeyPem,
+  })
+
+  return identity
+}
+
 const getRecipientPublicKey = async (recipientId: number) => {
   const response = await apiClient.get<string>(`/api/crypt/public_key/${recipientId}`)
   return response.data
