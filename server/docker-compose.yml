@@ -1,8 +1,8 @@
-version: "3.8"
-
 services:
   api:
-    build: ./api
+    build:
+      context: .
+      dockerfile: api/Dockerfile
     container_name: fastapi
     networks:
       - tor_net
@@ -23,5 +23,5 @@ services:
 networks:
   tor_net:
 
-#volumes:
-#  tor_hidden_service:
+volumes:
+  tor_hidden_service:
