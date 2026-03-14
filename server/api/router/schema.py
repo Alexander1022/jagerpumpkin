@@ -40,3 +40,11 @@ class FeedUser(BaseModel):
 
 class FeedResponse(BaseModel):
     users: list[FeedUser]
+
+class EnqueueMessageRequest(BaseModel):
+    content: bytes
+
+class EnqueueMessageResponse(BaseModel):
+    message_id: int
+    sender_id: int
+    recipient_id: int
