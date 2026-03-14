@@ -88,7 +88,7 @@ export default function MyCodeDialog() {
     <>
       <Button
         type="button"
-        variant="outline"
+        variant="default"
         size="sm"
         onClick={() => {
           setIsOpen(true)

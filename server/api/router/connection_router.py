@@ -36,7 +36,7 @@ def list_connections(user_id: int = Depends(get_user_id)):
 @router.post("/add")
 def add_connection(req: AddConnectionRequest, user_id: int = Depends(get_user_id)):
 
-    friend = session.query(User).filter_by(connection_code=req.code).first()
+    friend = session.query(User).filter_by(connection_code=req.connection_code).first()
 
     if not friend:
         raise HTTPException(status_code=404, detail="User with this code not found")

@@ -1,18 +1,29 @@
-import { getAllMessages, getCurrentUserIdFromToken } from "@/api/crypto"
+import { getCurrentUserIdFromToken } from "@/api/crypto"
+import apiClient from "@/api/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import AddConnectionDialog from "@/components/AddConnectionDialog"
 import MyCodeDialog from "@/components/MyCodeDialog"
 import { useAuth } from "@/context/AuthContext"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { LucideRefreshCcw } from "lucide-react"
 
 interface ConversationItem {
   id: number
   username: string
-  lastMessageAt: string
-  lastMessageId: number
-  messageCount: number
+  connectedAt: string
+}
+
+interface ConnectionItemResponse {
+  friend_id: number
+  friend_username: string
+  created_at: string
+}
+
+interface ConnectionsResponse {
+  connections: ConnectionItemResponse[]
 }
 
 const formatTimestamp = (value: string) => {
@@ -45,69 +56,25 @@ const Feed = () => {
     setIsLoading(true)
 
     try {
-      const allMessages = await getAllMessages()
-      const map = new Map<number, ConversationItem>()
+      const response =
+        await apiClient.get<ConnectionsResponse>("/api/connections")
 
-      for (const message of allMessages) {
-        const isSender = message.sender_id === currentUserId
-        const isRecipient = message.recipient_id === currentUserId
+      const ordered = response.data.connections
+        .map((connection) => ({
+          id: connection.friend_id,
+          username: connection.friend_username,
+          connectedAt: connection.created_at,
+        }))
+        .sort((a, b) => {
+          const aTime = new Date(a.connectedAt).getTime()
+          const bTime = new Date(b.connectedAt).getTime()
 
-        if (!isSender && !isRecipient) continue
+          if (Number.isNaN(aTime) || Number.isNaN(bTime) || aTime === bTime) {
+            return a.username.localeCompare(b.username)
+          }
 
-        const otherUserId = isSender ? message.recipient_id : message.sender_id
-        const otherUsername = isSender
-          ? message.recipient_username
-          : message.sender_username
-
-        const existing = map.get(otherUserId)
-        const nextTimestamp = new Date(message.created_at).getTime()
-        const prevTimestamp = existing
-          ? new Date(existing.lastMessageAt).getTime()
-          : Number.NEGATIVE_INFINITY
-
-        if (!existing) {
-          map.set(otherUserId, {
-            id: otherUserId,
-            username: otherUsername,
-            lastMessageAt: message.created_at,
-            lastMessageId: message.message_id,
-            messageCount: 1,
-          })
-          continue
-        }
-
-        const shouldReplace =
-          (Number.isFinite(nextTimestamp) &&
-            Number.isFinite(prevTimestamp) &&
-            nextTimestamp >= prevTimestamp) ||
-          (!Number.isFinite(prevTimestamp) && Number.isFinite(nextTimestamp)) ||
-          (!Number.isFinite(nextTimestamp) &&
-            !Number.isFinite(prevTimestamp) &&
-            message.message_id > existing.lastMessageId)
-
-        map.set(otherUserId, {
-          ...existing,
-          username: otherUsername,
-          lastMessageAt: shouldReplace
-            ? message.created_at
-            : existing.lastMessageAt,
-          lastMessageId: shouldReplace
-            ? message.message_id
-            : existing.lastMessageId,
-          messageCount: existing.messageCount + 1,
+          return bTime - aTime
         })
-      }
-
-      const ordered = [...map.values()].sort((a, b) => {
-        const aTime = new Date(a.lastMessageAt).getTime()
-        const bTime = new Date(b.lastMessageAt).getTime()
-
-        if (Number.isNaN(aTime) || Number.isNaN(bTime) || aTime === bTime) {
-          return b.lastMessageId - a.lastMessageId
-        }
-
-        return bTime - aTime
-      })
 
       setConversations(ordered)
     } catch {
@@ -137,6 +104,11 @@ const Feed = () => {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-xl">Your Chats</CardTitle>
             <div className="flex items-center gap-2">
+              <AddConnectionDialog
+                onConnectionAdded={() => {
+                  void loadConversations()
+                }}
+              />
               <MyCodeDialog />
               <Button
                 type="button"
@@ -147,7 +119,7 @@ const Feed = () => {
                 }}
                 disabled={isLoading}
               >
-                {isLoading ? "Syncing..." : "Refresh"}
+                {isLoading ? "Syncing..." : <LucideRefreshCcw size={16} />}
               </Button>
             </div>
           </div>
@@ -183,8 +155,7 @@ const Feed = () => {
                             {item.username}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {item.messageCount} messages · last activity{" "}
-                            {formatTimestamp(item.lastMessageAt)}
+                            Connected on {formatTimestamp(item.connectedAt)}
                           </p>
                         </div>
                         <span className="shrink-0 text-xs font-medium text-primary">
