@@ -9,7 +9,7 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
-    username = Column(String)
+    username = Column(String, unique=True)
     password = Column(String) #hash
     created_at = Column(DateTime, default=datetime.now())
     public_key = Column(String)
