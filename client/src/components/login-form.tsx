@@ -43,7 +43,7 @@ export function LoginForm({
 
     try {
       const response = await apiClient.post<LoginResponse>("/auth/login", {
-        username,
+        username: username.trim(),
         password,
       })
 
@@ -53,8 +53,12 @@ export function LoginForm({
       if (isAxiosError(error)) {
         const status = error.response?.status
 
-        if (status === 400) {
+        if (!error.response) {
+          setError("Cannot reach server right now. Please try again later.")
+        } else if (status === 401 || status === 400) {
           setError("Invalid credentials. Please try again.")
+        } else if (status === 429) {
+          setError("Too many login attempts. Please wait and try again.")
         } else if (status && status >= 500) {
           setError("Server error. Please try again later.")
         } else {
