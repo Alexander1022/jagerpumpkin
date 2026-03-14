@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from server.api.router.auth_router import router as auth_rt
 from server.api.router.asym_encript import router as crypt_rt
+from server.api.router.feed_router import router as feed_rt
 import os
 
 app = FastAPI()
@@ -30,3 +31,4 @@ def root():
 
 app.include_router(auth_rt, prefix="/api")
 app.include_router(crypt_rt, prefix="/api")
+app.include_router(feed_rt, prefix="/api")

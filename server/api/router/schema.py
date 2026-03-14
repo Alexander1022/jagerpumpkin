@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel
 
 class SignupRequest(BaseModel):
@@ -32,3 +33,10 @@ class SignupResponse(BaseModel):
 
 class MeResponse(BaseModel):
     username: str
+
+class FeedUser(BaseModel):
+    username: str
+    created_at: datetime
+
+class FeedResponse(BaseModel):
+    users: list[FeedUser]
