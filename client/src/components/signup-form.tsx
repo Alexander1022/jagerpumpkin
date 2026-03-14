@@ -19,6 +19,7 @@ import { Link, useNavigate } from "react-router-dom"
 import apiClient from "@/api/client"
 import { isAxiosError } from "axios"
 import { toast } from "sonner"
+import { getOrCreateClientIdentity } from "@/api/crypto"
 
 interface SignupResponse {
   message: string
@@ -59,10 +60,12 @@ export function SignupForm({
     setIsSubmitting(true)
 
     try {
+      const identity = await getOrCreateClientIdentity()
+
       await apiClient.post<SignupResponse>("/api/auth/signup", {
         username: username.trim(),
         password,
-        public_key: "",
+        public_key: identity.publicKeyPem,
       })
 
       toast.success("Account created successfully. You can now log in.")

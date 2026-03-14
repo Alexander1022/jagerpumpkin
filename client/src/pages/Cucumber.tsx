@@ -1,13 +1,286 @@
+import {
+  decryptReceivedMessage,
+  getAllMessages,
+  getCurrentUserIdFromToken,
+  sendEncryptedMessage,
+} from "@/api/crypto"
+import { useEffect, useMemo, useState } from "react"
+import { useNavigate, useParams } from "react-router-dom"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
+
+interface DisplayMessage {
+  message_id: number
+  sender_id: number
+  recipient_id: number
+  created_at: string
+  plaintext: string
+}
+
+interface SentMessage {
+  message_id: number
+  sender_id: number
+  recipient_id: number
+  created_at: string
+  plaintext: string
+}
+
+interface ChatMessage {
+  message_id: number
+  sender_id: number
+  recipient_id: number
+  created_at: string
+  plaintext: string
+  isOwn: boolean
+}
+
+interface SendMessageResponse {
+  message_id: number
+  sender_id: number
+  recipient_id: number
+}
+
+const formatTimestamp = (value: string) => {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return date.toLocaleString()
+}
+
 export default function Cucumber() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [message, setMessage] = useState("")
+  const [isSending, setIsSending] = useState(false)
+  const [messages, setMessages] = useState<DisplayMessage[]>([])
+  const [sentMessages, setSentMessages] = useState<SentMessage[]>([])
+  const [isLoadingMessages, setIsLoadingMessages] = useState(true)
+
+  const recipientId = Number(id)
+  const canSend = Number.isInteger(recipientId) && recipientId > 0
+  const currentUserId = getCurrentUserIdFromToken()
+
+  const loadMessages = async () => {
+    setIsLoadingMessages(true)
+
+    try {
+      const all = await getAllMessages()
+
+      if (currentUserId) {
+        const received = all.filter(
+          (item) => item.recipient_id === currentUserId
+        )
+
+        const decrypted = await Promise.all(
+          received.map(async (item) => {
+            try {
+              const plaintext = await decryptReceivedMessage(item)
+              return {
+                message_id: item.message_id,
+                sender_id: item.sender_id,
+                recipient_id: item.recipient_id,
+                created_at: item.created_at,
+                plaintext,
+                decryptOk: true,
+              }
+            } catch {
+              return {
+                message_id: item.message_id,
+                sender_id: item.sender_id,
+                recipient_id: item.recipient_id,
+                created_at: item.created_at,
+                plaintext: "[Unable to decrypt message]",
+                decryptOk: false,
+              }
+            }
+          })
+        )
+
+        setMessages(decrypted.map(({ decryptOk: _decryptOk, ...item }) => item))
+      } else {
+        setMessages([])
+        setSentMessages([])
+        navigate("/login", { replace: true })
+      }
+    } catch {
+      setMessages([])
+    } finally {
+      setIsLoadingMessages(false)
+    }
+  }
+
+  useEffect(() => {
+    loadMessages()
+  }, [])
+
+  const visibleMessages = useMemo<ChatMessage[]>(() => {
+    const received = messages.map((item) => ({
+      ...item,
+      isOwn: false,
+    }))
+
+    const sent = sentMessages.map((item) => ({
+      ...item,
+      isOwn: true,
+    }))
+
+    return [...received, ...sent].sort((a, b) => {
+      const timeA = new Date(a.created_at).getTime()
+      const timeB = new Date(b.created_at).getTime()
+
+      if (Number.isNaN(timeA) || Number.isNaN(timeB) || timeA === timeB) {
+        return a.message_id - b.message_id
+      }
+
+      return timeA - timeB
+    })
+  }, [messages, sentMessages])
+
+  const handleSend = async () => {
+    if (!canSend || !message.trim() || isSending || !currentUserId) return
+
+    setIsSending(true)
+    const rawMessage = message.trim()
+
+    try {
+      const response = await sendEncryptedMessage(recipientId, rawMessage)
+      const payload = response.data as SendMessageResponse
+
+      setSentMessages((prev) => [
+        ...prev,
+        {
+          message_id: payload.message_id,
+          sender_id: payload.sender_id,
+          recipient_id: payload.recipient_id,
+          created_at: new Date().toISOString(),
+          plaintext: rawMessage,
+        },
+      ])
+
+      setMessage("")
+      await loadMessages()
+    } finally {
+      setIsSending(false)
+    }
+  }
+
   return (
-    <div className="flex h-[calc(100svh-7rem)] w-full items-center justify-center overflow-hidden bg-white px-6 py-4 md:px-10">
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <h1 className="text-2xl font-bold">Cucumber Page</h1>
-        <p>
-          This is the Cucumber page. It is protected and requires authentication
-          to access.
-        </p>
-      </div>
+    <div className="mx-auto flex h-[calc(100svh-7rem)] w-full max-w-3xl flex-col px-4 py-4 md:px-6 md:py-6">
+      <Card className="h-full bg-linear-to-b from-background to-muted/20">
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-xl">Encrypted Chat</CardTitle>
+              <CardDescription>
+                End-to-end encrypted channel with user {id}
+              </CardDescription>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                loadMessages()
+              }}
+              disabled={isLoadingMessages}
+            >
+              {isLoadingMessages ? "Syncing..." : "Refresh"}
+            </Button>
+          </div>
+        </CardHeader>
+
+        <Separator />
+
+        <CardContent className="flex h-full min-h-0 flex-col gap-4 py-4">
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border bg-background/70 p-3">
+            {visibleMessages.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
+                No messages yet.
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {visibleMessages.map((item) => (
+                  <li
+                    key={item.message_id}
+                    className={
+                      item.isOwn
+                        ? "flex w-full justify-end"
+                        : "flex w-full justify-start"
+                    }
+                  >
+                    <div
+                      className={
+                        item.isOwn
+                          ? "max-w-[85%] rounded-2xl rounded-br-sm border bg-primary px-3 py-2 text-sm text-primary-foreground shadow-xs"
+                          : "max-w-[85%] rounded-2xl rounded-bl-sm border bg-muted px-3 py-2 text-sm shadow-xs"
+                      }
+                    >
+                      <p
+                        className={
+                          item.isOwn
+                            ? "mb-1 wrap-break-word text-primary-foreground"
+                            : "mb-1 wrap-break-word text-foreground"
+                        }
+                      >
+                        {item.plaintext}
+                      </p>
+                      <p
+                        className={
+                          item.isOwn
+                            ? "text-[11px] text-primary-foreground/70"
+                            : "text-[11px] text-muted-foreground"
+                        }
+                      >
+                        {item.isOwn ? "you" : `from ${item.sender_id}`} at{" "}
+                        {formatTimestamp(item.created_at)}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="rounded-lg border bg-background/80 p-3">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                placeholder="Write an encrypted message..."
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault()
+                    handleSend()
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                onClick={handleSend}
+                disabled={!canSend || isSending || !message.trim()}
+              >
+                {isSending ? "Sending..." : "Send"}
+              </Button>
+            </div>
+            {!canSend ? (
+              <p className="mt-2 text-xs text-destructive">
+                Invalid recipient id in route. Use /chat/&lt;userId&gt;.
+              </p>
+            ) : null}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

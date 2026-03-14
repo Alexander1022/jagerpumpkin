@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Annotated
 
 from server.api.router.auth_router import get_current_user
+from server.db import session, User
 
 class KeyExchangeRequest(BaseModel):
     client_id: str
@@ -61,6 +62,17 @@ def get_public_key():
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
     return public_key_pem.decode()
+
+@router.get("/public_key/{user_id}")
+def get_user_public_key(user_id: int):
+    user = session.query(User).filter_by(id=user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not user.public_key:
+        raise HTTPException(status_code=404, detail="Public key not found")
+
+    return user.public_key
 
 @router.post("/exchange_key")
 def exchange_key(data: KeyExchangeRequest, user: Annotated[str, Depends(get_current_user)]):

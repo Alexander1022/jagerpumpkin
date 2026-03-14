@@ -42,9 +42,27 @@ class FeedResponse(BaseModel):
     users: list[FeedUser]
 
 class EnqueueMessageRequest(BaseModel):
-    content: bytes
+    encrypted_message: str
+    encrypted_key: str
+    iv: str
 
 class EnqueueMessageResponse(BaseModel):
     message_id: int
     sender_id: int
     recipient_id: int
+
+
+class MessageItemResponse(BaseModel):
+    message_id: int
+    sender_id: int
+    sender_username: str
+    recipient_id: int
+    recipient_username: str
+    encrypted_message: str
+    encrypted_key: str
+    iv: str
+    created_at: datetime
+
+
+class MessageListResponse(BaseModel):
+    messages: list[MessageItemResponse]
