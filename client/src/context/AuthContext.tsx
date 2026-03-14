@@ -14,7 +14,6 @@ import {
 } from "react"
 
 interface User {
-  id: string
   username: string
 }
 
@@ -43,7 +42,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error("Failed to fetch user profile:", error)
 
-      // Clear session only when the token is no longer valid.
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         logout()
       }

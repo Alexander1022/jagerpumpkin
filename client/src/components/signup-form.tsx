@@ -18,6 +18,7 @@ import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import apiClient from "@/api/client"
 import { isAxiosError } from "axios"
+import { toast } from "sonner"
 
 interface SignupResponse {
   message: string
@@ -64,6 +65,7 @@ export function SignupForm({
         public_key: "",
       })
 
+      toast.success("Account created successfully. You can now log in.")
       navigate("/login", { replace: true })
     } catch (err) {
       if (isAxiosError(err)) {
