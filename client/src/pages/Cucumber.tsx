@@ -57,6 +57,17 @@ interface SendMessageResponse {
   created_at: string
 }
 
+interface UserProfileResponse {
+  user_id: number
+  username: string
+  created_at: string
+}
+
+interface MeResponse {
+  user_id: number
+  username: string
+}
+
 const formatTimestamp = (value: string) => {
   const date = new Date(value)
 
@@ -91,16 +102,70 @@ export default function Cucumber() {
   const [isSending, setIsSending] = useState(false)
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [sentMessages, setSentMessages] = useState<SentMessage[]>([])
-  const [isLoadingMessages, setIsLoadingMessages] = useState(true)
+  const [recipientUsername, setRecipientUsername] = useState<string | null>(
+    null
+  )
+  const [isResolvingRecipient, setIsResolvingRecipient] = useState(true)
 
   const recipientId = Number(id)
   const canSend = Number.isInteger(recipientId) && recipientId > 0
   const currentUsername = user?.username ?? null
   const currentUserId = getCurrentUserIdFromToken()
 
-  const loadMessages = useCallback(async () => {
-    setIsLoadingMessages(true)
+  useEffect(() => {
+    let cancelled = false
 
+    const loadRecipientProfile = async () => {
+      if (!canSend) {
+        navigate("/feed", { replace: true })
+        return
+      }
+
+      setRecipientUsername(null)
+      setIsResolvingRecipient(true)
+
+      try {
+        const meResponse = await apiClient.get<MeResponse>("/api/auth/me")
+
+        if (meResponse.data.user_id === recipientId) {
+          if (!cancelled) {
+            navigate("/feed", { replace: true })
+          }
+          return
+        }
+
+        const response = await apiClient.get<UserProfileResponse>(
+          `/api/users/${recipientId}`
+        )
+
+        if (!cancelled) {
+          setRecipientUsername(response.data.username)
+        }
+      } catch (error) {
+        const status = (error as { response?: { status?: number } }).response
+          ?.status
+
+        if (!cancelled) {
+          if (status === 404 || status === 422) {
+            navigate("/feed", { replace: true })
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setIsResolvingRecipient(false)
+        }
+      }
+    }
+
+    setSentMessages([])
+    void loadRecipientProfile()
+
+    return () => {
+      cancelled = true
+    }
+  }, [canSend, navigate, recipientId])
+
+  const loadMessages = useCallback(async () => {
     try {
       const all = await getAllMessages()
 
@@ -108,7 +173,7 @@ export default function Cucumber() {
         const received = all.filter(
           (item) =>
             item.recipient_username === currentUsername &&
-            item.sender_username !== currentUsername
+            item.sender_id === recipientId
         )
 
         const decrypted = await Promise.all(
@@ -148,10 +213,8 @@ export default function Cucumber() {
       }
     } catch {
       setMessages([])
-    } finally {
-      setIsLoadingMessages(false)
     }
-  }, [currentUsername, navigate])
+  }, [currentUsername, navigate, recipientId])
 
   useEffect(() => {
     loadMessages()
@@ -285,7 +348,15 @@ export default function Cucumber() {
   }, [messages, sentMessages])
 
   const handleSend = async () => {
-    if (!canSend || !message.trim() || isSending || !currentUsername) return
+    if (
+      !canSend ||
+      !message.trim() ||
+      isSending ||
+      !currentUsername ||
+      !recipientUsername
+    ) {
+      return
+    }
 
     setIsSending(true)
     const rawMessage = message.trim()
@@ -301,7 +372,7 @@ export default function Cucumber() {
           sender_id: payload.sender_id,
           sender_username: currentUsername,
           recipient_id: payload.recipient_id,
-          recipient_username: String(id ?? ""),
+          recipient_username: recipientUsername,
           created_at: payload.created_at,
           plaintext: rawMessage,
         },
@@ -320,9 +391,17 @@ export default function Cucumber() {
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <CardTitle className="text-xl">Encrypted Chat</CardTitle>
+              <CardTitle className="text-xl">
+                {isResolvingRecipient
+                  ? "Resolving chat..."
+                  : recipientUsername
+                    ? recipientUsername
+                    : "Encrypted Chat"}
+              </CardTitle>
               <CardDescription>
-                End-to-end encrypted channel with user {id}
+                {recipientUsername
+                  ? `End-to-end encrypted channel with ${recipientUsername}`
+                  : `End-to-end encrypted channel with user ${id}`}
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -335,17 +414,6 @@ export default function Cucumber() {
                 }}
               >
                 Back to feed
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  loadMessages()
-                }}
-                disabled={isLoadingMessages}
-              >
-                {isLoadingMessages ? "Syncing..." : "Refresh"}
               </Button>
             </div>
           </div>
@@ -419,7 +487,9 @@ export default function Cucumber() {
               <Button
                 type="button"
                 onClick={handleSend}
-                disabled={!canSend || isSending || !message.trim()}
+                disabled={
+                  !canSend || isSending || !message.trim() || !recipientUsername
+                }
               >
                 {isSending ? "Sending..." : "Send"}
               </Button>

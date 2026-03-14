@@ -32,6 +32,7 @@ class SignupResponse(BaseModel):
     created_at: str
 
 class MeResponse(BaseModel):
+    user_id: int
     username: str
 
 class FeedUser(BaseModel):
@@ -72,4 +73,9 @@ class MessageListResponse(BaseModel):
 class DequeueMessageResponse(BaseModel):
     message_id: int
     content: bytes
+    created_at: datetime
+
+class UserProfileResponse(BaseModel):
+    user_id: int
+    username: str
     created_at: datetime
