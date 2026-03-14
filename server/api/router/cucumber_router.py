@@ -5,6 +5,8 @@ import json
 from sqlalchemy import or_
 from sqlalchemy.orm import aliased
 
+from server.api.router.websocket_router import manager
+
 from server.api.router.feed_router import get_user_id
 from server.api.router.schema import (
     DequeueMessageResponse,
@@ -61,9 +63,13 @@ def get_messages(user_id: int = Depends(get_user_id)):
 
     return MessageListResponse(messages=messages)
 
-@router.post("/{user_id}", response_model=EnqueueMessageResponse)
-def enqueue_message(user_id: int, req: EnqueueMessageRequest, sender_id: int = Depends(get_user_id)):
-    recipient = session.query(User).filter_by(id=user_id).first()
+@router.post("/{recipient_id}", response_model=EnqueueMessageResponse)
+async def enqueue_message(recipient_id: int, req: EnqueueMessageRequest, sender_id: int = Depends(get_user_id)):
+    if manager.is_user_connected(recipient_id):
+        await manager.send_personal_message(req, recipient_id)
+        return
+        
+    recipient = session.query(User).filter_by(id=recipient_id).first()
     if not recipient:
         raise HTTPException(status_code=404, detail="Recipient not found")
 
@@ -84,7 +90,7 @@ def enqueue_message(user_id: int, req: EnqueueMessageRequest, sender_id: int = D
 
     msg = Message_Queue(
         sender_id=sender_id,
-        recipient_id=user_id,
+        recipient_id=recipient_id,
         content=content_payload,
     )
 
@@ -95,7 +101,7 @@ def enqueue_message(user_id: int, req: EnqueueMessageRequest, sender_id: int = D
     return EnqueueMessageResponse(
         message_id=msg.id,
         sender_id=sender_id,
-        recipient_id=user_id
+        recipient_id=recipient_id
     )
 
 @router.get("/{sender_id}", response_model=DequeueMessageResponse)
