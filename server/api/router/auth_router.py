@@ -2,8 +2,26 @@ from fastapi import APIRouter, HTTPException
 import bcrypt
 import hashlib
 
-from server.api.router.schema import SignupRequest, LoginRequest
+from server.api.router.schema import SignupRequest, LoginRequest, SignupResponse, AuthResponse
 from server.db import session, User
+
+import jwt
+from datetime import datetime, timedelta
+
+import os
+SECRET_KEY = os.environ["JWT_SECRET"]
+ALGORITHM = "HS256"
+TOKEN_EXPIRE_MINUTES = 60
+
+
+def create_access_token(user_id: int, username: str) -> str:
+    payload = {
+        "sub": str(user_id),
+        "username": username,
+        "exp": datetime.utcnow() + timedelta(minutes=TOKEN_EXPIRE_MINUTES)
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -17,7 +35,7 @@ def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(digest, hashed.encode())
 
 
-@router.post("/signup")
+@router.post("/signup", response_model=SignupResponse)
 def signup(req: SignupRequest):
     existing = session.query(User).filter_by(username=req.username).first()
     if existing:
@@ -34,10 +52,14 @@ def signup(req: SignupRequest):
     session.add(user)
     session.commit()
 
-    return {"message": "user created"}
+    return SignupResponse(
+        user_id=user.id,
+        username=user.username,
+        created_at=user.created_at.isoformat()
+    )
 
 
-@router.post("/login")
+@router.post("/login", response_model=AuthResponse)
 def login(req: LoginRequest):
     user = session.query(User).filter_by(username=req.username).first()
 
@@ -47,4 +69,10 @@ def login(req: LoginRequest):
     if not verify_password(req.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    return {"message": "login success", "user_id": user.id}
+    token = create_access_token(user.id, user.username)
+
+    return AuthResponse(
+        user_id=user.id,
+        username=user.username,
+        access_token=token
+    )
