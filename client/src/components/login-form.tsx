@@ -13,6 +13,7 @@ import { useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import apiClient from "@/api/client"
 import { useAuth } from "@/context/AuthContext"
+import { exchangeSessionAesKey } from "@/api/crypto"
 
 interface LoginResponse {
   tokens: {
@@ -55,6 +56,7 @@ export function LoginForm({
         response.data.tokens.access_token,
         response.data.tokens.refresh_token,
       )
+      await exchangeSessionAesKey(username.trim())
       navigate(fromPath, { replace: true })
     } catch (error) {
       if (isAxiosError(error)) {
