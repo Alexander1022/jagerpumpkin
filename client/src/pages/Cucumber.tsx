@@ -325,17 +325,29 @@ export default function Cucumber() {
                 End-to-end encrypted channel with user {id}
               </CardDescription>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                loadMessages()
-              }}
-              disabled={isLoadingMessages}
-            >
-              {isLoadingMessages ? "Syncing..." : "Refresh"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigate("/feed")
+                }}
+              >
+                Back to feed
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  loadMessages()
+                }}
+                disabled={isLoadingMessages}
+              >
+                {isLoadingMessages ? "Syncing..." : "Refresh"}
+              </Button>
+            </div>
           </div>
         </CardHeader>
 
