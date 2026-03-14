@@ -7,6 +7,7 @@ from sqlalchemy.orm import aliased
 
 from server.api.router.feed_router import get_user_id
 from server.api.router.schema import (
+    DequeueMessageResponse,
     EnqueueMessageRequest,
     EnqueueMessageResponse,
     MessageItemResponse,
@@ -96,3 +97,24 @@ def enqueue_message(user_id: int, req: EnqueueMessageRequest, sender_id: int = D
         sender_id=sender_id,
         recipient_id=user_id
     )
+
+@router.get("/{sender_id}", response_model=DequeueMessageResponse)
+def dequeue_message(sender_id: int, recipient_id: int = Depends(get_user_id)):
+    msg = session.query(Message_Queue).filter(
+        Message_Queue.sender_id == sender_id,
+        Message_Queue.recipient_id == recipient_id
+    ).order_by(Message_Queue.created_at).first()
+
+    if not msg:
+        raise HTTPException(status_code=404, detail="No message found")
+
+    response = DequeueMessageResponse(
+        message_id=msg.id,
+        content=msg.content,
+        created_at=msg.created_at
+    )
+
+    session.delete(msg)
+    session.commit()
+
+    return response

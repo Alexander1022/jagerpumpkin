@@ -66,3 +66,9 @@ class MessageItemResponse(BaseModel):
 
 class MessageListResponse(BaseModel):
     messages: list[MessageItemResponse]
+
+
+class DequeueMessageResponse(BaseModel):
+    message_id: int
+    content: bytes
+    created_at: datetime

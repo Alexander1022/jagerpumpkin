@@ -117,22 +117,30 @@ def refresh_token(req: RefreshRequest):
         refresh_token=req.refresh_token
     )
 
-def get_current_user(authorization: str = Header(...)) -> str:
+def get_user_id(authorization: str = Header(...)) -> int:
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid auth header")
-    token = authorization[len("Bearer "):].strip()  # strip whitespace
+
+    token = authorization[len("Bearer "):].strip()
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
         if payload.get("type") != "access":
             raise HTTPException(status_code=401, detail="Invalid token type")
-        return payload["username"]
+
+        return int(payload["sub"])
+
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Access token expired")
+
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
 @router.get("/me", response_model=MeResponse)
-def me(user: str = Depends(get_current_user)):
+def me(user_id: int = Depends(get_user_id)):
+    user = session.query(User).filter_by(id=user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
     return MeResponse(username=user)

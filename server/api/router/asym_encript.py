@@ -8,7 +8,7 @@ from pathlib import Path
 
 from typing import Annotated
 
-from server.api.router.auth_router import get_current_user
+from server.api.router.auth_router import get_user_id
 from server.db import session, User
 
 class KeyExchangeRequest(BaseModel):
@@ -75,7 +75,7 @@ def get_user_public_key(user_id: int):
     return user.public_key
 
 @router.post("/exchange_key")
-def exchange_key(data: KeyExchangeRequest, user: Annotated[str, Depends(get_current_user)]):
+def exchange_key(data: KeyExchangeRequest, user: Annotated[str, Depends(get_user_id)]):
     try:
         encrypted_key_bytes = base64.b64decode(data.encrypted_key, validate=True)
         symmetric_key = keys[0].decrypt(
