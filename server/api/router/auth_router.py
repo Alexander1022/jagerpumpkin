@@ -66,6 +66,7 @@ def signup(req: SignupRequest):
     return SignupResponse(
         user_id=user.id,
         username=user.username,
+        connection_code=user.connection_code,
         created_at=user.created_at.isoformat()
     )
 
