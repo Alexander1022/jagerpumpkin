@@ -48,3 +48,8 @@ class EnqueueMessageResponse(BaseModel):
     message_id: int
     sender_id: int
     recipient_id: int
+
+class DequeueMessageResponse(BaseModel):
+    message_id: int
+    content: bytes
+    created_at: datetime
