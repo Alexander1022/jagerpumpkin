@@ -11,7 +11,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String, unique=True)
     password = Column(String) #hash
-    created_at = Column(DateTime, default=datetime.now())
+    created_at = Column(DateTime, default=datetime.now)
     public_key = Column(String)
 
     def __repr__(self) -> str:
