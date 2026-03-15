@@ -385,6 +385,24 @@ export default function Cucumber() {
     }
   }
 
+  if (isResolvingRecipient) {
+    return (
+      <div className="mx-auto flex h-[calc(100svh-7rem)] w-full max-w-3xl flex-col px-4 py-4 md:px-6 md:py-6">
+        <Card className="h-full bg-linear-to-b from-background to-muted/20">
+          <CardContent className="flex h-full flex-col items-center justify-center gap-4 text-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/25 border-t-primary" />
+            <div>
+              <p className="text-base font-medium">Opening secure chat...</p>
+              <p className="text-sm text-muted-foreground">
+                Tor may be slow, but it keeps your conversations private and secure.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto flex h-[calc(100svh-7rem)] w-full max-w-3xl flex-col px-4 py-4 md:px-6 md:py-6">
       <Card className="h-full bg-linear-to-b from-background to-muted/20">
@@ -392,11 +410,7 @@ export default function Cucumber() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <CardTitle className="text-xl">
-                {isResolvingRecipient
-                  ? "Resolving chat..."
-                  : recipientUsername
-                    ? recipientUsername
-                    : "Encrypted Chat"}
+                {recipientUsername ? recipientUsername : "Encrypted Chat"}
               </CardTitle>
               <CardDescription>
                 {recipientUsername
