@@ -10,6 +10,12 @@ interface AddConnectionDialogProps {
   onConnectionAdded?: () => void | Promise<void>
 }
 
+const CONNECTION_ERROR_DETAILS = new Set([
+  "User with this code not found",
+  "Cannot connect to yourself",
+  "Already connected",
+])
+
 export default function AddConnectionDialog({
   onConnectionAdded,
 }: AddConnectionDialogProps) {
@@ -55,11 +61,11 @@ export default function AddConnectionDialog({
     setSuccessMessage(null)
 
     try {
-      // Това трябва да се оправи, че да работи
-      // Не приемаме connection_code на бекенда
-      await apiClient.post("/api/connections/add", {
+      const payload: { connection_code: string } = {
         connection_code: trimmed,
-      })
+      }
+
+      await apiClient.post("/api/connections/add", payload)
 
       setSuccessMessage("Connection added")
 
@@ -70,9 +76,22 @@ export default function AddConnectionDialog({
       setCode("")
     } catch (error) {
       if (axios.isAxiosError(error)) {
+        const status = error.response?.status
         const detail = error.response?.data?.detail
-        if (typeof detail === "string" && detail.length > 0) {
-          setErrorMessage(detail)
+
+        if (
+          typeof detail === "string" &&
+          CONNECTION_ERROR_DETAILS.has(detail)
+        ) {
+          if (status) {
+            setErrorMessage(`${detail}`)
+          } else {
+            setErrorMessage(detail)
+          }
+        } else if (typeof detail === "string" && detail.length > 0) {
+          setErrorMessage(status ? `${detail}` : detail)
+        } else if (status) {
+          setErrorMessage(`Request failed with status ${status}`)
         } else {
           setErrorMessage("Could not add connection")
         }
