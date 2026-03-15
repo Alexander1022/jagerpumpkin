@@ -34,7 +34,7 @@ def get_connected_users_status(user_id: int = Depends(get_user_id)) -> UsersStat
     result : dict[int, UserStatus] = {}
     now = datetime.utcnow()
     for friend_id in friends_id:
-        if manager.is_friend(friend_id):
+        if manager.is_user_connected(friend_id):
             result[friend_id] = UserStatus(user_id=friend_id, timestamp=now)
 
     return UsersStatusResponse(users_status=result)
