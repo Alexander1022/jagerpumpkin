@@ -10,7 +10,6 @@ import MyCodeDialog from "@/components/MyCodeDialog"
 import { useAuth } from "@/context/AuthContext"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { LucideRefreshCcw } from "lucide-react"
 
 interface ConversationItem {
   id: number
@@ -35,6 +34,19 @@ interface UserStatusResponseItem {
 
 interface UsersStatusResponse {
   users_status: Record<string, UserStatusResponseItem>
+}
+
+const sortConversations = (items: ConversationItem[]) => {
+  return [...items].sort((a, b) => {
+    const aTime = new Date(a.connectedAt).getTime()
+    const bTime = new Date(b.connectedAt).getTime()
+
+    if (Number.isNaN(aTime) || Number.isNaN(bTime) || aTime === bTime) {
+      return a.username.localeCompare(b.username)
+    }
+
+    return bTime - aTime
+  })
 }
 
 const getAvatarFallback = (username: string) => {
@@ -88,18 +100,10 @@ const Feed = () => {
           username: connection.friend_username,
           connectedAt: connection.created_at,
         }))
-        .sort((a, b) => {
-          const aTime = new Date(a.connectedAt).getTime()
-          const bTime = new Date(b.connectedAt).getTime()
 
-          if (Number.isNaN(aTime) || Number.isNaN(bTime) || aTime === bTime) {
-            return a.username.localeCompare(b.username)
-          }
+      const sorted = sortConversations(ordered)
 
-          return bTime - aTime
-        })
-
-      setConversations(ordered)
+      setConversations(sorted)
     } catch {
       setConversations([])
     } finally {
@@ -109,7 +113,8 @@ const Feed = () => {
 
   const loadOnlineStatuses = useCallback(async () => {
     try {
-      const response = await apiClient.get<UsersStatusResponse>("/api/users/status")
+      const response =
+        await apiClient.get<UsersStatusResponse>("/api/users/status")
       const usersStatus = response.data.users_status ?? {}
       const onlineIds = Object.values(usersStatus)
         .map((item) => item.user_id)
@@ -131,16 +136,60 @@ const Feed = () => {
 
   useEffect(() => {
     const unsubscribe = subscribeToWebSocketEvents((payload) => {
+      if (payload.type === "CONNECTIONS_UPDATED") {
+        if (
+          payload.action === "added" &&
+          Number.isInteger(payload.friend_id) &&
+          typeof payload.friend_username === "string" &&
+          typeof payload.connected_at === "string"
+        ) {
+          const friendId = payload.friend_id as number
+          const friendUsername = payload.friend_username
+          const connectedAt = payload.connected_at
+
+          setConversations((prev) => {
+            const filtered = prev.filter((item) => item.id !== friendId)
+            filtered.unshift({
+              id: friendId,
+              username: friendUsername,
+              connectedAt,
+            })
+            return sortConversations(filtered)
+          })
+          return
+        }
+
+        if (payload.action === "removed" && Number.isInteger(payload.friend_id)) {
+          setConversations((prev) =>
+            prev.filter((item) => item.id !== (payload.friend_id as number))
+          )
+          setOnlineUserIds((prev) => {
+            const next = new Set(prev)
+            next.delete(payload.friend_id as number)
+            return next
+          })
+          return
+        }
+
+        void refreshFeedData()
+        return
+      }
+
       if (payload.type === "PRESENCE_SNAPSHOT") {
         const ids = Array.isArray(payload.online_user_ids)
-          ? payload.online_user_ids.filter((id): id is number => Number.isInteger(id))
+          ? payload.online_user_ids.filter((id): id is number =>
+              Number.isInteger(id)
+            )
           : []
 
         setOnlineUserIds(new Set(ids))
         return
       }
 
-      if (payload.type === "PRESENCE_ONLINE" && Number.isInteger(payload.user_id)) {
+      if (
+        payload.type === "PRESENCE_ONLINE" &&
+        Number.isInteger(payload.user_id)
+      ) {
         setOnlineUserIds((prev) => {
           const next = new Set(prev)
           next.add(payload.user_id as number)
@@ -149,7 +198,10 @@ const Feed = () => {
         return
       }
 
-      if (payload.type === "PRESENCE_OFFLINE" && Number.isInteger(payload.user_id)) {
+      if (
+        payload.type === "PRESENCE_OFFLINE" &&
+        Number.isInteger(payload.user_id)
+      ) {
         setOnlineUserIds((prev) => {
           const next = new Set(prev)
           next.delete(payload.user_id as number)
@@ -161,7 +213,7 @@ const Feed = () => {
     return () => {
       unsubscribe()
     }
-  }, [])
+  }, [refreshFeedData])
 
   const filteredConversations = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -208,17 +260,6 @@ const Feed = () => {
                 }}
               />
               <MyCodeDialog />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  void refreshFeedData()
-                }}
-                disabled={isLoading}
-              >
-                {isLoading ? "Syncing..." : <LucideRefreshCcw size={16} />}
-              </Button>
             </div>
           </div>
           <Input
@@ -244,55 +285,62 @@ const Feed = () => {
                 const isOnline = onlineUserIds.has(item.id)
 
                 return (
-                <li key={item.id}>
-                  <Card
-                    size="sm"
-                    className="border transition-colors hover:bg-muted/40"
-                  >
-                    <CardContent className="flex items-center justify-between gap-3 py-3">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <Avatar>
-                          <AvatarFallback>
-                            {getAvatarFallback(item.username)}
-                          </AvatarFallback>
-                        </Avatar>
+                  <li key={item.id}>
+                    <Card
+                      size="sm"
+                      className="border transition-colors hover:bg-muted/40"
+                    >
+                      <CardContent className="flex items-center justify-between gap-3 py-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <Avatar>
+                            <AvatarFallback>
+                              {getAvatarFallback(item.username)}
+                            </AvatarFallback>
+                          </Avatar>
 
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">
-                            {item.username}
-                          </p>
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            <span className="inline-flex items-center gap-1">
-                              <span
-                                className={`h-2 w-2 rounded-full ${
-                                  isOnline ? "bg-emerald-500" : "bg-muted-foreground/40"
-                                }`}
-                              />
-                              {isOnline ? "Online" : "Offline"}
-                            </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">
+                              {item.username}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                              <span className="inline-flex items-center gap-1">
+                                <span
+                                  className={`h-2 w-2 rounded-full ${
+                                    isOnline
+                                      ? "bg-emerald-500"
+                                      : "bg-muted-foreground/40"
+                                  }`}
+                                />
+                                {isOnline ? "Online" : "Offline"}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex shrink-0 items-center gap-2">
-                        <Button asChild type="button" variant="outline" size="sm">
-                          <Link to={`/chat/${item.id}`}>Open chat</Link>
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => {
-                            setDeleteError(null)
-                            setConversationToDelete(item)
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </li>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Button
+                            asChild
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                          >
+                            <Link to={`/chat/${item.id}`}>Open chat</Link>
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => {
+                              setDeleteError(null)
+                              setConversationToDelete(item)
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </li>
                 )
               })}
             </ul>
@@ -309,8 +357,8 @@ const Feed = () => {
 
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Are you sure you want to remove {conversationToDelete.username} from
-                your connections?
+                Are you sure you want to remove {conversationToDelete.username}{" "}
+                from your connections?
               </p>
 
               {deleteError ? (

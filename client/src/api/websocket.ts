@@ -2,8 +2,12 @@ import apiClient from "@/api/client"
 
 interface WebSocketPayload {
   type?: string
+  action?: string
   sender_id?: number
   user_id?: number
+  friend_id?: number
+  friend_username?: string
+  connected_at?: string
   online_user_ids?: number[]
   timestamp?: string
 }
