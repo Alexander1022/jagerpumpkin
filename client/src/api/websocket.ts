@@ -3,6 +3,9 @@ import apiClient from "@/api/client"
 interface WebSocketPayload {
   type?: string
   sender_id?: number
+  user_id?: number
+  online_user_ids?: number[]
+  timestamp?: string
 }
 
 type WebSocketListener = (payload: WebSocketPayload) => void

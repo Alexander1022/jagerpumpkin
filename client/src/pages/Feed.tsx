@@ -1,5 +1,6 @@
 import { getCurrentUserIdFromToken } from "@/api/crypto"
 import apiClient from "@/api/client"
+import { subscribeToWebSocketEvents } from "@/api/websocket"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,14 +28,13 @@ interface ConnectionsResponse {
   connections: ConnectionItemResponse[]
 }
 
-const formatTimestamp = (value: string) => {
-  const date = new Date(value)
+interface UserStatusResponseItem {
+  user_id: number
+  timestamp: string
+}
 
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown time"
-  }
-
-  return date.toLocaleString(undefined, { timeZone: "UTC" }) + " UTC"
+interface UsersStatusResponse {
+  users_status: Record<string, UserStatusResponseItem>
 }
 
 const getAvatarFallback = (username: string) => {
@@ -64,6 +64,7 @@ const Feed = () => {
     useState<ConversationItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<number>>(new Set())
 
   const loadConversations = useCallback(async () => {
     const currentUserId = getCurrentUserIdFromToken()
@@ -106,9 +107,61 @@ const Feed = () => {
     }
   }, [navigate, user])
 
+  const loadOnlineStatuses = useCallback(async () => {
+    try {
+      const response = await apiClient.get<UsersStatusResponse>("/api/users/status")
+      const usersStatus = response.data.users_status ?? {}
+      const onlineIds = Object.values(usersStatus)
+        .map((item) => item.user_id)
+        .filter((id): id is number => Number.isInteger(id))
+
+      setOnlineUserIds(new Set(onlineIds))
+    } catch {
+      // Ignore transient status fetch errors and keep current presence state.
+    }
+  }, [])
+
+  const refreshFeedData = useCallback(async () => {
+    await Promise.all([loadConversations(), loadOnlineStatuses()])
+  }, [loadConversations, loadOnlineStatuses])
+
   useEffect(() => {
-    loadConversations()
-  }, [loadConversations])
+    void refreshFeedData()
+  }, [refreshFeedData])
+
+  useEffect(() => {
+    const unsubscribe = subscribeToWebSocketEvents((payload) => {
+      if (payload.type === "PRESENCE_SNAPSHOT") {
+        const ids = Array.isArray(payload.online_user_ids)
+          ? payload.online_user_ids.filter((id): id is number => Number.isInteger(id))
+          : []
+
+        setOnlineUserIds(new Set(ids))
+        return
+      }
+
+      if (payload.type === "PRESENCE_ONLINE" && Number.isInteger(payload.user_id)) {
+        setOnlineUserIds((prev) => {
+          const next = new Set(prev)
+          next.add(payload.user_id as number)
+          return next
+        })
+        return
+      }
+
+      if (payload.type === "PRESENCE_OFFLINE" && Number.isInteger(payload.user_id)) {
+        setOnlineUserIds((prev) => {
+          const next = new Set(prev)
+          next.delete(payload.user_id as number)
+          return next
+        })
+      }
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [])
 
   const filteredConversations = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -134,7 +187,7 @@ const Feed = () => {
     try {
       await apiClient.delete(`/api/connections/${conversationToDelete.id}`)
       setConversationToDelete(null)
-      await loadConversations()
+      await refreshFeedData()
     } catch {
       setDeleteError("Could not delete connection")
     } finally {
@@ -151,7 +204,7 @@ const Feed = () => {
             <div className="flex items-center gap-2">
               <AddConnectionDialog
                 onConnectionAdded={() => {
-                  void loadConversations()
+                  void refreshFeedData()
                 }}
               />
               <MyCodeDialog />
@@ -160,7 +213,7 @@ const Feed = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  loadConversations()
+                  void refreshFeedData()
                 }}
                 disabled={isLoading}
               >
@@ -187,7 +240,10 @@ const Feed = () => {
             </p>
           ) : (
             <ul className="space-y-2">
-              {filteredConversations.map((item) => (
+              {filteredConversations.map((item) => {
+                const isOnline = onlineUserIds.has(item.id)
+
+                return (
                 <li key={item.id}>
                   <Card
                     size="sm"
@@ -205,9 +261,16 @@ const Feed = () => {
                           <p className="truncate text-sm font-medium">
                             {item.username}
                           </p>
-                          <p className="text-xs text-muted-foreground">
-                            Connected on {formatTimestamp(item.connectedAt)}
-                          </p>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-1">
+                              <span
+                                className={`h-2 w-2 rounded-full ${
+                                  isOnline ? "bg-emerald-500" : "bg-muted-foreground/40"
+                                }`}
+                              />
+                              {isOnline ? "Online" : "Offline"}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -230,7 +293,8 @@ const Feed = () => {
                     </CardContent>
                   </Card>
                 </li>
-              ))}
+                )
+              })}
             </ul>
           )}
         </CardContent>

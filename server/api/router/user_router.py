@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from server.api.router.auth_router import get_user_id
 from server.api.router.websocket_router import manager
@@ -26,7 +26,7 @@ def get_user_profile(user_id: int):
 def get_connected_users_status(user_id: int = Depends(get_user_id)) -> UsersStatusResponse:
     rows = (
         session.query(ConnectionDB.friend_id)
-        .filter_by(ConnectionDB.user_id == user_id)
+        .filter(ConnectionDB.user_id == user_id)
         .all()
     )
 
