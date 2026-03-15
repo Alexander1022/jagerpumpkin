@@ -103,3 +103,10 @@ class AddConnectionRequest(BaseModel):
 
 class ConnectionCodeResponse(BaseModel):
     connection_code: str
+
+class UserStatus(BaseModel):
+    user_id: int
+    timestamp: datetime
+
+class UsersStatusResponse(BaseModel):
+    users_status : dict[int, UserStatus]
