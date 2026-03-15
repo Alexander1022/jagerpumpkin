@@ -77,6 +77,7 @@ const Feed = () => {
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [onlineUserIds, setOnlineUserIds] = useState<Set<number>>(new Set())
+  const [unreadUserIds, setUnreadUserIds] = useState<Set<number>>(new Set())
 
   const loadConversations = useCallback(async () => {
     const currentUserId = getCurrentUserIdFromToken()
@@ -168,6 +169,11 @@ const Feed = () => {
             next.delete(payload.friend_id as number)
             return next
           })
+          setUnreadUserIds((prev) => {
+            const next = new Set(prev)
+            next.delete(payload.friend_id as number)
+            return next
+          })
           return
         }
 
@@ -183,6 +189,37 @@ const Feed = () => {
           : []
 
         setOnlineUserIds(new Set(ids))
+        return
+      }
+
+      if (
+        payload.type === "NEW_MESSAGE" &&
+        Number.isInteger(payload.sender_id)
+      ) {
+        const senderId = payload.sender_id as number
+
+        setUnreadUserIds((prev) => {
+          const next = new Set(prev)
+          next.add(senderId)
+          return next
+        })
+
+        setConversations((prev) => {
+          const senderIndex = prev.findIndex((item) => item.id === senderId)
+          if (senderIndex <= 0) {
+            return prev
+          }
+
+          const next = [...prev]
+          const [senderConversation] = next.splice(senderIndex, 1)
+
+          if (!senderConversation) {
+            return prev
+          }
+
+          next.unshift(senderConversation)
+          return next
+        })
         return
       }
 
@@ -214,6 +251,25 @@ const Feed = () => {
       unsubscribe()
     }
   }, [refreshFeedData])
+
+  useEffect(() => {
+    setUnreadUserIds((prev) => {
+      if (prev.size === 0) {
+        return prev
+      }
+
+      const conversationIds = new Set(conversations.map((item) => item.id))
+      const next = new Set(
+        Array.from(prev).filter((userId) => conversationIds.has(userId))
+      )
+
+      if (next.size === prev.size) {
+        return prev
+      }
+
+      return next
+    })
+  }, [conversations])
 
   const filteredConversations = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -283,6 +339,7 @@ const Feed = () => {
             <ul className="space-y-2">
               {filteredConversations.map((item) => {
                 const isOnline = onlineUserIds.has(item.id)
+                const hasUnread = unreadUserIds.has(item.id)
 
                 return (
                   <li key={item.id}>
@@ -313,6 +370,12 @@ const Feed = () => {
                                 />
                                 {isOnline ? "Online" : "Offline"}
                               </span>
+                              {hasUnread ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 font-medium text-amber-700">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                  New message
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                         </div>
@@ -324,7 +387,22 @@ const Feed = () => {
                             variant="outline"
                             size="sm"
                           >
-                            <Link to={`/chat/${item.id}`}>Open chat</Link>
+                            <Link
+                              to={`/chat/${item.id}`}
+                              onClick={() => {
+                                setUnreadUserIds((prev) => {
+                                  if (!prev.has(item.id)) {
+                                    return prev
+                                  }
+
+                                  const next = new Set(prev)
+                                  next.delete(item.id)
+                                  return next
+                                })
+                              }}
+                            >
+                              Open chat
+                            </Link>
                           </Button>
                           <Button
                             type="button"
