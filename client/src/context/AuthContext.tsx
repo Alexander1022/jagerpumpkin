@@ -3,6 +3,10 @@ import {
   hasAuthToken,
   setAuthToken,
 } from "@/api/client"
+import {
+  startWebSocketConnection,
+  stopWebSocketConnection,
+} from "@/api/websocket"
 import apiClient from "@/api/client"
 import axios from "axios"
 import {
@@ -14,6 +18,7 @@ import {
 } from "react"
 
 interface User {
+  user_id: number
   username: string
 }
 
@@ -54,6 +59,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     fetchProfile()
   }, [])
 
+  useEffect(() => {
+    if (user?.user_id) {
+      startWebSocketConnection(user.user_id)
+      return
+    }
+
+    stopWebSocketConnection()
+  }, [user])
+
   const login = async (token: string, refreshToken?: string) => {
     setAuthToken(token, refreshToken)
     await fetchProfile()
@@ -61,6 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = () => {
     setUser(null)
+    stopWebSocketConnection()
     clearAuthToken()
   }
 
