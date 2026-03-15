@@ -1,7 +1,12 @@
-from fastapi import APIRouter, HTTPException, Query
-from server.db import User
+from datetime import datetime
+
+from fastapi import APIRouter, HTTPException, Query, Depends
+
+from server.api.router.auth_router import get_user_id
+from server.api.router.websocket_router import manager
+from server.db import User, ConnectionDB
 from server.db import session
-from server.api.router.schema import UserProfileResponse
+from server.api.router.schema import UserProfileResponse, UserStatus, UsersStatusResponse
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -16,3 +21,21 @@ def get_user_profile(user_id: int):
         username=user.username,
         created_at=user.created_at
     )
+
+@router.get("/status", response_model=UsersStatusResponse)
+def get_connected_users_status(user_id: int = Depends(get_user_id)) -> UsersStatusResponse:
+    rows = (
+        session.query(ConnectionDB.friend_id)
+        .filter_by(ConnectionDB.user_id == user_id)
+        .all()
+    )
+
+    friends_id = [r.friend_id for r in rows]
+    result : dict[int, UserStatus] = {}
+    now = datetime.utcnow()
+    for friend_id in friends_id:
+        if manager.is_friend(friend_id):
+            result[friend_id] = UserStatus(user_id=friend_id, timestamp=now)
+
+    return UsersStatusResponse(users_status=result)
+
