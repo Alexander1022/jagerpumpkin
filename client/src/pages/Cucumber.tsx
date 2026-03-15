@@ -69,6 +69,51 @@ interface MeResponse {
   username: string
 }
 
+const readStoredMessages = (key: string) => {
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) {
+      return [] as DisplayMessage[]
+    }
+
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) {
+      return [] as DisplayMessage[]
+    }
+
+    return parsed.filter(
+      (item): item is DisplayMessage =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as DisplayMessage).message_id === "number" &&
+        typeof (item as DisplayMessage).sender_id === "number" &&
+        typeof (item as DisplayMessage).sender_username === "string" &&
+        typeof (item as DisplayMessage).recipient_id === "number" &&
+        typeof (item as DisplayMessage).recipient_username === "string" &&
+        typeof (item as DisplayMessage).created_at === "string" &&
+        typeof (item as DisplayMessage).plaintext === "string"
+    )
+  } catch {
+    return [] as DisplayMessage[]
+  }
+}
+
+const writeStoredMessages = (key: string, data: DisplayMessage[]) => {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(data))
+  } catch {
+    // Ignore storage failures (private mode, quota, etc.)
+  }
+}
+
+const getMessageIdentity = (message: {
+  message_id: number
+  sender_id: number
+  recipient_id: number
+  created_at: string
+}) =>
+  `${message.sender_id}:${message.recipient_id}:${message.created_at}:${message.message_id}`
+
 const formatTimestamp = (value: string) => {
   const date = new Date(value)
 
@@ -112,6 +157,11 @@ export default function Cucumber() {
   const recipientId = Number(id)
   const canSend = Number.isInteger(recipientId) && recipientId > 0
   const currentUsername = user?.username ?? null
+  const currentUserId = user?.user_id ?? null
+  const messageCacheKey =
+    currentUserId && canSend
+      ? `cucumber-received-${currentUserId}-${recipientId}`
+      : null
 
   useEffect(() => {
     let cancelled = false
@@ -158,6 +208,7 @@ export default function Cucumber() {
       }
     }
 
+    setMessages([])
     setSentMessages([])
     void loadRecipientProfile()
 
@@ -165,6 +216,14 @@ export default function Cucumber() {
       cancelled = true
     }
   }, [canSend, navigate, recipientId])
+
+  useEffect(() => {
+    if (!messageCacheKey) {
+      return
+    }
+
+    setMessages(readStoredMessages(messageCacheKey))
+  }, [messageCacheKey])
 
   const loadMessages = useCallback(async () => {
     try {
@@ -206,16 +265,33 @@ export default function Cucumber() {
           })
         )
 
-        setMessages(decrypted.map(({ decryptOk: _decryptOk, ...item }) => item))
+        const nextReceived = decrypted.map(({ decryptOk: _decryptOk, ...item }) => item)
+        setMessages((prev) => {
+          const merged = new Map<string, DisplayMessage>()
+
+          prev.forEach((item) => {
+            merged.set(getMessageIdentity(item), item)
+          })
+
+          nextReceived.forEach((item) => {
+            merged.set(getMessageIdentity(item), item)
+          })
+
+          const mergedValues = Array.from(merged.values())
+          if (messageCacheKey) {
+            writeStoredMessages(messageCacheKey, mergedValues)
+          }
+          return mergedValues
+        })
       } else {
         setMessages([])
         setSentMessages([])
         navigate("/login", { replace: true })
       }
     } catch {
-      setMessages([])
+      // Keep current in-memory messages on transient fetch/decrypt issues.
     }
-  }, [currentUsername, navigate, recipientId])
+  }, [currentUsername, messageCacheKey, navigate, recipientId])
 
   useEffect(() => {
     loadMessages()
@@ -366,7 +442,7 @@ export default function Cucumber() {
               <ul className="space-y-3">
                 {visibleMessages.map((item) => (
                   <li
-                    key={item.message_id}
+                    key={getMessageIdentity(item)}
                     className={
                       item.isOwn
                         ? "flex w-full justify-end"

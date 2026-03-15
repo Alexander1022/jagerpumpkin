@@ -40,12 +40,16 @@ def get_messages(user_id: int = Depends(get_user_id)):
     )
 
     messages: list[MessageItemResponse] = []
+    received_message_ids: list[int] = []
 
     for row, sender_username, recipient_username in records:
         try:
             payload = json.loads((row.content or b"{}").decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
             payload = {}
+
+        if row.recipient_id == user_id:
+            received_message_ids.append(row.id)
 
         messages.append(
             MessageItemResponse(
@@ -60,6 +64,12 @@ def get_messages(user_id: int = Depends(get_user_id)):
                 created_at=row.created_at,
             )
         )
+
+    if received_message_ids:
+        session.query(Message_Queue).filter(
+            Message_Queue.id.in_(received_message_ids)
+        ).delete(synchronize_session=False)
+        session.commit()
 
     return MessageListResponse(messages=messages)
 
@@ -92,12 +102,11 @@ async def enqueue_message(recipient_id: int, req: EnqueueMessageRequest, sender_
     session.commit()
     session.refresh(msg)
 
-    if manager.is_user_connected(recipient_id):
-        notification = json.dumps({
-            "type": "NEW_MESSAGE",
-            "sender_id": sender_id
-        })
-        await manager.send_personal_message(notification, recipient_id)
+    notification = json.dumps({
+        "type": "NEW_MESSAGE",
+        "sender_id": sender_id
+    })
+    await manager.send_personal_message(notification, recipient_id)
 
     return EnqueueMessageResponse(
         message_id=msg.id,
