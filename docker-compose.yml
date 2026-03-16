@@ -11,14 +11,6 @@ services:
     env_file:
       - server/.env
 
-  client:
-    build:
-      context: ./client
-      dockerfile: Dockerfile
-    container_name: react
-    ports:
-      - "5173:5173"
-
   tor:
     image: osminogin/tor-simple
     container_name: tor
@@ -29,6 +21,18 @@ services:
       - server
     networks:
       - tor_net
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: react
+    volumes:
+      - ./server/hidden_service:/var/lib/tor/hidden_service
+    depends_on:
+      - tor
+    ports:
+      - "5173:5173"
 
 networks:
   tor_net:
