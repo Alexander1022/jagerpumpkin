@@ -1,24 +1,24 @@
 services:
-  api:
+  server:
     build:
-      context: .
-      dockerfile: api/Dockerfile
+      context: ./server
+      dockerfile: Dockerfile
     container_name: fastapi
     networks:
       - tor_net
     expose:
       - 8000
     env_file:
-      - .env
+      - server/.env
 
   tor:
     image: osminogin/tor-simple
     container_name: tor
     volumes:
-      - ./torrc:/etc/tor/torrc
-      - ./hidden_service:/var/lib/tor/hidden_service
+      - ./server/torrc:/etc/tor/torrc
+      - ./server/hidden_service:/var/lib/tor/hidden_service
     depends_on:
-      - api
+      - server
     networks:
       - tor_net
 
