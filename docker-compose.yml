@@ -11,6 +11,14 @@ services:
     env_file:
       - server/.env
 
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: react
+    ports:
+      - "5173:5173"
+
   tor:
     image: osminogin/tor-simple
     container_name: tor
