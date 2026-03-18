@@ -1,17 +1,23 @@
 #!/bin/bash
 
-npm run --prefix ./client dev -- --host 127.0.0.1 --port 5173 > /dev/null 2>&1 &
-FRONTEND_PID=$!
+if [[ ! -d "server/hidden_service" ]]; then
+	echo "Creating hidden service directory..."
+	mkdir -p server/hidden_service
+	chmod 700 server/hidden_service
+fi
 
-DOCKERFLAG=""
-if [[ $# -eq 1 && $1 = "--build" ]]; then
-	echo "Building docker images"
-	DOCKERFLAG="$1"
+if [[ ! -f "server/.env" ]]; then
+	echo "Creating server .env file..."
+	echo "JWT_SECRET=YourJWTSecret" > server/.env
+fi
+
+DOCKERFLAG="--build"
+if [[ $# -eq 1 && $1 = "--no-build" ]]; then
+	echo "Using existing docker images"
+	DOCKERFLAG=""
 elif [[ $# -ne 0 ]]; then
 	echo "Bad args"; exit 1
 fi
 
-docker compose -f ./server/docker-compose.yml up ${DOCKERFLAG}
-
-docker compose down
-kill $FRONTEND_PID
+trap "docker compose -f ./docker-compose.yml down" EXIT
+docker compose -f ./docker-compose.yml up ${DOCKERFLAG}

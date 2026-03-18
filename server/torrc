@@ -2,4 +2,4 @@ SocksPort 0
 
 HiddenServiceDir /var/lib/tor/hidden_service/
 HiddenServiceVersion 3
-HiddenServicePort 80 api:8000
+HiddenServicePort 80 server:8000

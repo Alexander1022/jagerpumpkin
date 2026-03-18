@@ -1,0 +1,41 @@
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: fastapi
+    networks:
+      - tor_net
+    expose:
+      - 8000
+    env_file:
+      - server/.env
+
+  tor:
+    image: osminogin/tor-simple
+    container_name: tor
+    volumes:
+      - ./server/torrc:/etc/tor/torrc
+      - ./server/hidden_service:/var/lib/tor/hidden_service
+    depends_on:
+      - server
+    networks:
+      - tor_net
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: react
+    volumes:
+      - ./server/hidden_service:/var/lib/tor/hidden_service
+    depends_on:
+      - tor
+    ports:
+      - "5173:5173"
+
+networks:
+  tor_net:
+
+volumes:
+  tor_hidden_service:
